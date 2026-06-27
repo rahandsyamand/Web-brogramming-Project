@@ -16,7 +16,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $age    = intval($_POST['age']);
         $gender = mysqli_real_escape_string($conn, $_POST['gender']);
         $phone  = mysqli_real_escape_string($conn, trim($_POST['phone']));
-        $blood  = mysqli_real_escape_string($conn, $_POST['blood_type']);
+
+
+         $blood  = mysqli_real_escape_string($conn, $_POST['blood_type']);
         $doctor = mysqli_real_escape_string($conn, $_POST['doctor']);
         $notes  = mysqli_real_escape_string($conn, trim($_POST['notes']));
 
