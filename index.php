@@ -1,14 +1,178 @@
 <?php
-$conn =mysqli_connect("localhost","root","","hospital_db");
-if($conn->connect_error){
+
+$conn = mysqli_connect("localhost", "root", "", "hospitalsystem_db");
+if ($conn->connect_error) {
     die("Connection failed: " . $conn->connect_error);
-  echo "Connected successfully";
 }
 
 
+$message = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+    $action = $_POST['action'];
+
+    if ($action === 'add_patient') {
+        $name   = mysqli_real_escape_string($conn, trim($_POST['name']));
+        $age    = intval($_POST['age']);
+        $gender = mysqli_real_escape_string($conn, $_POST['gender']);
+        $phone  = mysqli_real_escape_string($conn, trim($_POST['phone']));
+        $blood  = mysqli_real_escape_string($conn, $_POST['blood_type']);
+        $doctor = mysqli_real_escape_string($conn, $_POST['doctor']);
+        $notes  = mysqli_real_escape_string($conn, trim($_POST['notes']));
+
+        if ($name !== '') {
+            $res = mysqli_query($conn, "INSERT INTO patients (name,age,gender,phone,blood_type,doctor,notes,status)
+                VALUES ('$name','$age','$gender','$phone','$blood','$doctor','$notes','Waiting')");
+            if ($res) {
+                $new_id = mysqli_insert_id($conn);
+                $code   = 'P' . str_pad($new_id, 3, '0', STR_PAD_LEFT);
+                mysqli_query($conn, "UPDATE patients SET patient_code='$code' WHERE id=$new_id");
+                $message = "<div class='alert alert-success'>✔ Patient <strong>$name</strong> added successfully.</div>";
+            }
+        }
+    }
+
+    elseif ($action === 'delete_patient') {
+        $id = intval($_POST['id']);
+        mysqli_query($conn, "DELETE FROM patients WHERE id=$id");
+        $message = "<div class='alert alert-danger'>✔ Patient deleted.</div>";
+    }
+
+    elseif ($action === 'add_doctor') {
+        $name  = mysqli_real_escape_string($conn, trim($_POST['name']));
+        $spec  = mysqli_real_escape_string($conn, $_POST['specialization']);
+        $phone = mysqli_real_escape_string($conn, trim($_POST['phone']));
+        $days  = mysqli_real_escape_string($conn, trim($_POST['working_days']));
+        $shift = mysqli_real_escape_string($conn, $_POST['shift']);
+
+        if (!str_starts_with($name, 'Dr.')) $name = 'Dr. ' . $name;
+
+        if ($name !== 'Dr. ') {
+            $res = mysqli_query($conn, "INSERT INTO doctors (name,specialization,phone,working_days,shift,status)
+                VALUES ('$name','$spec','$phone','$days','$shift','Available')");
+            if ($res) {
+                $new_id = mysqli_insert_id($conn);
+                $code   = 'D' . str_pad($new_id, 3, '0', STR_PAD_LEFT);
+                mysqli_query($conn, "UPDATE doctors SET doctor_code='$code' WHERE id=$new_id");
+                $message = "<div class='alert alert-success'>✔ Doctor <strong>$name</strong> added successfully.</div>";
+            }
+        }
+    }
+
+    elseif ($action === 'delete_doctor') {
+        $id = intval($_POST['id']);
+        mysqli_query($conn, "DELETE FROM doctors WHERE id=$id");
+        $message = "<div class='alert alert-danger'>✔ Doctor deleted.</div>";
+    }
+
+    elseif ($action === 'add_room') {
+        $num     = mysqli_real_escape_string($conn, trim($_POST['room_number']));
+        $type    = mysqli_real_escape_string($conn, $_POST['type']);
+        $floor   = mysqli_real_escape_string($conn, trim($_POST['floor']));
+        $patient = mysqli_real_escape_string($conn, trim($_POST['patient']));
+        $status  = ($patient !== '') ? 'Occupied' : 'Available';
+
+        if ($num !== '') {
+            mysqli_query($conn, "INSERT INTO rooms (room_number,type,floor,patient,status)
+                VALUES ('$num','$type','$floor','$patient','$status')");
+            $message = "<div class='alert alert-success'>✔ Room <strong>$num</strong> added successfully.</div>";
+        }
+    }
+
+    elseif ($action === 'delete_room') {
+        $id = intval($_POST['id']);
+        mysqli_query($conn, "DELETE FROM rooms WHERE id=$id");
+        $message = "<div class='alert alert-danger'>✔ Room deleted.</div>";
+    }
+
+    elseif ($action === 'discharge_room') {
+        $id = intval($_POST['id']);
+        mysqli_query($conn, "UPDATE rooms SET patient='', status='Available' WHERE id=$id");
+        $message = "<div class='alert alert-success'>✔ Patient discharged. Room is now available.</div>";
+    }
+
+    elseif ($action === 'assign_room') {
+        $id      = intval($_POST['id']);
+        $patient = mysqli_real_escape_string($conn, trim($_POST['patient']));
+        if ($patient !== '') {
+            mysqli_query($conn, "UPDATE rooms SET patient='$patient', status='Occupied' WHERE id=$id");
+            $message = "<div class='alert alert-success'>✔ Room assigned to <strong>$patient</strong>.</div>";
+        }
+    }
+
+    elseif ($action === 'add_billing') {
+        $patient  = mysqli_real_escape_string($conn, trim($_POST['patient']));
+        $room_c   = floatval($_POST['room_charge']);
+        $doc_fee  = floatval($_POST['doctor_fee']);
+        $medicine = floatval($_POST['medicine']);
+        $lab      = floatval($_POST['lab_tests']);
+        $other    = floatval($_POST['other']);
+        $total    = $room_c + $doc_fee + $medicine + $lab + $other;
+
+        if ($patient !== '') {
+            $res = mysqli_query($conn, "INSERT INTO billing (patient,room_charge,doctor_fee,medicine,lab_tests,other,total,status)
+                VALUES ('$patient','$room_c','$doc_fee','$medicine','$lab','$other','$total','Pending')");
+            if ($res) {
+                $new_id = mysqli_insert_id($conn);
+                $code   = 'INV-' . str_pad($new_id, 3, '0', STR_PAD_LEFT);
+                mysqli_query($conn, "UPDATE billing SET invoice_code='$code' WHERE id=$new_id");
+                $message = "<div class='alert alert-success'>✔ Invoice <strong>$code</strong> generated for <strong>$patient</strong>.</div>";
+            }
+        }
+    }
+
+    elseif ($action === 'add_appointment') {
+        $patient = mysqli_real_escape_string($conn, trim($_POST['patient']));
+        $doctor  = mysqli_real_escape_string($conn, trim($_POST['doctor']));
+        $date    = mysqli_real_escape_string($conn, $_POST['appt_date']);
+        $time    = mysqli_real_escape_string($conn, $_POST['appt_time']);
+        $reason  = mysqli_real_escape_string($conn, trim($_POST['reason']));
+
+        if ($patient !== '' && $doctor !== '' && $date !== '' && $time !== '') {
+            $res = mysqli_query($conn, "INSERT INTO appointments (patient,doctor,appt_date,appt_time,reason,status)
+                VALUES ('$patient','$doctor','$date','$time','$reason','Pending')");
+            if ($res) {
+                $new_id = mysqli_insert_id($conn);
+                $code   = 'APT-' . str_pad($new_id, 3, '0', STR_PAD_LEFT);
+                mysqli_query($conn, "UPDATE appointments SET appt_code='$code' WHERE id=$new_id");
+                $message = "<div class='alert alert-success'>✔ Appointment <strong>$code</strong> booked for <strong>$patient</strong>.</div>";
+            }
+        } else {
+            $message = "<div class='alert alert-danger'>✘ Please fill in all required fields.</div>";
+        }
+    }
+
+    elseif ($action === 'update_appt_status') {
+        $id     = intval($_POST['id']);
+        $status = mysqli_real_escape_string($conn, $_POST['status']);
+        mysqli_query($conn, "UPDATE appointments SET status='$status' WHERE id=$id");
+        $message = "<div class='alert alert-success'>✔ Appointment status updated to <strong>$status</strong>.</div>";
+    }
+
+    elseif ($action === 'delete_appointment') {
+        $id = intval($_POST['id']);
+        mysqli_query($conn, "DELETE FROM appointments WHERE id=$id");
+        $message = "<div class='alert alert-danger'>✔ Appointment deleted.</div>";
+    }
+
+    elseif ($action === 'delete_billing') {
+        $id = intval($_POST['id']);
+        mysqli_query($conn, "DELETE FROM billing WHERE id=$id");
+        $message = "<div class='alert alert-danger'>✔ Invoice deleted.</div>";
+    }
+}
 
 
+$patients     = mysqli_query($conn, "SELECT * FROM patients     ORDER BY id DESC");
+$doctors      = mysqli_query($conn, "SELECT * FROM doctors      ORDER BY id DESC");
+$rooms        = mysqli_query($conn, "SELECT * FROM rooms        ORDER BY id ASC");
+$invoices     = mysqli_query($conn, "SELECT * FROM billing      ORDER BY id DESC");
+$appointments = mysqli_query($conn, "SELECT * FROM appointments ORDER BY appt_date ASC, appt_time ASC");
 
+$patient_count  = mysqli_num_rows($patients);
+$doctor_count   = mysqli_num_rows($doctors);
+$room_occupied  = mysqli_num_rows(mysqli_query($conn, "SELECT id FROM rooms WHERE status='Occupied'"));
+$today_appts    = mysqli_num_rows(mysqli_query($conn, "SELECT id FROM appointments WHERE appt_date=CURDATE()"));
 ?>
 <!DOCTYPE html>
 <html>
